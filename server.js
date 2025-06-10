@@ -4,14 +4,12 @@ const express = require("express");
 const favicon = require("serve-favicon");
 const bodyParser = require("body-parser");
 const session = require("express-session");
-// const csrf = require('csurf');
 const consolidate = require("consolidate"); // Templating library adapter for Express
 const swig = require("swig");
-// const helmet = require("helmet");
 const MongoClient = require("mongodb").MongoClient; // Driver for connecting to MongoDB
 const http = require("http");
 const marked = require("marked");
-//const nosniff = require('dont-sniff-mimetype');
+const helmet = require("helmet"); // Added helmet
 const app = express(); // Web framework to handle routing requests
 const routes = require("./app/routes");
 const { port, db, cookieSecret } = require("./config/config"); // Application config properties
@@ -34,6 +32,24 @@ MongoClient.connect(db, (err, db) => {
         process.exit(1);
     }
     console.log(`Connected to the database`);
+
+    // Disable x-powered-by header
+    app.disable("x-powered-by");
+
+    // Enable helmet middleware with security headers
+    app.use(helmet());
+
+    // Optional: customize CSP headers
+    app.use(
+        helmet.contentSecurityPolicy({
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'", "https:"],
+                styleSrc: ["'self'", "https:", "'unsafe-inline'"],
+                imgSrc: ["'self'", "data:", "https:"],
+            },
+        })
+    );
 
     /*
     // Fix for A5 - Security MisConfig
@@ -80,9 +96,14 @@ MongoClient.connect(db, (err, db) => {
         //    return genuuid() // use UUIDs for session IDs
         //},
         secret: cookieSecret,
-        // Both mandatory in Express v4
-        saveUninitialized: true,
-        resave: true
+        saveUninitialized: false,
+        resave: false,
+        cookie: {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production', // Enable in production
+            sameSite: 'lax',
+            maxAge: 3600000 // 1 hour
+        }
         /*
         // Fix for A5 - Security MisConfig
         // Use generic cookie name
